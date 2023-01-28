@@ -33,10 +33,10 @@ namespace cider::exec::nextgen::parsers {
 using namespace cider::exec::nextgen::operators;
 
 static bool isParseable(const RelAlgExecutionUnit& eu) {
-  if (eu.groupby_exprs.size() > 1 || *eu.groupby_exprs.begin() != nullptr) {
-    LOG(ERROR) << "GroupBy is not supported in RelAlgExecutionUnitParser.";
-    return false;
-  }
+  // if (eu.groupby_exprs.size() > 1 || *eu.groupby_exprs.begin() != nullptr) {
+  //   LOG(ERROR) << "GroupBy is not supported in RelAlgExecutionUnitParser.";
+  //   return false;
+  // }
 
   return true;
 }

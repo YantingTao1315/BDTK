@@ -46,6 +46,8 @@ class RuntimeContext {
   void addHashTable(const CodegenContext::HashTableDescriptorPtr& descriptor);
   void addCiderSet(const CodegenContext::CiderSetDescriptorPtr& descriptor);
 
+  void addAggHashTable(const CodegenContext::AggHashTableDescriptorPtr& descriptor);
+
   void instantiate(const CiderAllocatorPtr& allocator);
 
   const int8_t* getTrimStringOperCharMapById(int id) const;
@@ -100,6 +102,7 @@ class RuntimeContext {
   std::shared_ptr<StringHeap> string_heap_ptr_;
   CodegenContext::HashTableDescriptorPtr hashtable_holder_;
   CodegenContext::TrimCharMapsPtr trim_char_maps_;
+  CodegenContext::AggHashTableDescriptorPtr agg_hashtable_holder_;
 };
 
 using RuntimeCtxPtr = std::unique_ptr<RuntimeContext>;

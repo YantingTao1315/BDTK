@@ -109,7 +109,7 @@ class NonGroupbyAggTest : public ::testing::Test {
     auto runtime_ctx = executeAndReturnRuntimeCtx(create_ddl, sql, array);
 
     auto buffer = reinterpret_cast<cider::exec::nextgen::context::Buffer*>(
-        runtime_ctx->getContextItem(1));
+        runtime_ctx->getContextItem(2));
     auto under_buffer64 = reinterpret_cast<int64_t*>(buffer->getBuffer());
     EXPECT_EQ(under_buffer64[0], 22);
     auto under_buffer32 = reinterpret_cast<int32_t*>(buffer->getBuffer() + 8);
@@ -335,6 +335,65 @@ TEST_F(NonGroupbyAggTest, TestResultMinMaxInt8NotNull) {
                             "select min(a), max(b) from test",
                             input_data,
                             {11, 10});
+}
+
+class GroupbyAggTest : public ::testing::Test {
+ public:
+  void executeTestHashTable(const std::string& create_ddl,
+                            const std::string& sql,
+                            ArrowArray* array) {
+    auto runtime_ctx = executeAndReturnRuntimeCtx(create_ddl, sql, array);
+
+    auto agg_hashtable = reinterpret_cast<cider::hashtable::AggregationHashTable*>(
+        runtime_ctx->getContextItem(1));
+    // Row0:
+    // Generate a key = 1
+    int8_t* key1_ptr = allocator->allocate(4);
+    reinterpret_cast<bool*>(key1_ptr)[0] = (bool)false;
+    reinterpret_cast<int8_t*>(key1_ptr + 2)[0] = (int8_t)1;
+
+    auto under_buffer8 = reinterpret_cast<int8_t*>(agg_hashtable->get(key1_ptr));
+    EXPECT_EQ(under_buffer8[0], 3);
+
+    int8_t* key2_ptr = allocator->allocate(4);
+    reinterpret_cast<bool*>(key1_ptr)[0] = (bool)false;
+    reinterpret_cast<int8_t*>(key1_ptr + 2)[0] = (int8_t)2;
+
+    auto under_buffer8_2 = reinterpret_cast<int8_t*>(agg_hashtable->get(key2_ptr));
+    EXPECT_EQ(under_buffer8_2[0], 6);
+  }
+
+  template <typename COL_TYPE>
+  void executeTestResult(const std::string& create_ddl,
+                         const std::string& sql,
+                         ArrowArray* array,
+                         std::vector<COL_TYPE> res) {
+    auto runtime_ctx = executeAndReturnRuntimeCtx(create_ddl, sql, array);
+
+    // auto output_batch_array = runtime_ctx->getGroupByAggOutputBatch()->getArray();
+    // EXPECT_EQ(output_batch_array->length, 1);
+
+    // for (size_t i = 0; i < res.size(); i++) {
+    //   check_array<COL_TYPE>(output_batch_array->children[i], 1, {res[i]});
+  }
+};
+
+TEST_F(GroupbyAggTest, TestHashTableInt8) {
+  auto input_builder = ArrowArrayBuilder();
+  auto&& [_, input_data] =
+      input_builder.setRowNum(10)
+          .addColumn<int64_t>(
+              "a",
+              CREATE_SUBSTRAIT_TYPE(I8),
+              {1, 2, 3, 1, 2, 4, 1, 2, 3, 4},
+              {true, false, false, false, false, false, false, false, false, false})
+          .addColumn<int32_t>(
+              "b", CREATE_SUBSTRAIT_TYPE(I8), {1, 11, 111, 2, 22, 222, 3, 33, 333, 555})
+          .build();
+
+  executeTestHashTable("CREATE TABLE test(a TINYINT, b TINYINT);",
+                       "select sum(a) from test group by a",
+                       input_data);
 }
 
 int main(int argc, char** argv) {

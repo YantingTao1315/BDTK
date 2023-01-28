@@ -20,6 +20,7 @@
  */
 
 #include "exec/nextgen/operators/AggregationNode.h"
+#include "exec/template/TypePunning.h"
 
 namespace cider::exec::nextgen::operators {
 TranslatorPtr AggNode::toTranslator(const TranslatorPtr& succ) {
@@ -173,28 +174,62 @@ void AggTranslator::codegen(context::CodegenContext& context) {
   std::vector<int8_t> origin_value = initOriginValue(exprs_info);
 
   // Groupby
+  jitlib::JITValuePointer value_buffer;
   // TODO(Yanting): support group-by
   auto agg_node = dynamic_cast<AggNode*>(node_.get());
   auto& groupby_exprs = agg_node->getGroupByExprs();
   if (groupby_exprs.size() != 0) {
-    LOG(ERROR) << "group-by is not supported now.";
+    // initial hash table
+    using SQLTypeVector = std::vector<SQLTypes>;
+    SQLTypeVector key_types, value_types;
+    for (const auto& g_expr : groupby_exprs) {
+      key_types.push_back(g_expr->get_type_info().get_type());
+    };
+    auto hash_table = context.registerAggHashTable(
+        key_types, origin_value.data(), origin_value.size(), "agg_hash_table");
+
+    JITValuePointerVector key_struct;
+    for (const auto& g_expr : groupby_exprs) {
+      utils::FixSizeJITExprValue values(g_expr->get_expr_value());
+      key_struct.push_back(values.getNull());
+      key_struct.push_back(values.getValue());
+    };
+    auto keys_addr = func->packJITValuesVector<2>(key_struct);
+    value_buffer.replace(func->emitRuntimeFunctionCall(
+        "nextgen_cider_get_value_by_key",
+        jitlib::JITFunctionEmitDescriptor{
+            .ret_type = jitlib::JITTypeTag::POINTER,
+            .ret_sub_type = jitlib::JITTypeTag::INT8,
+            .params_vector = {hash_table.get(), keys_addr.get()}}));
   }
 
+  ExprPtrVector& output_exprs = exprs;
+  auto batch = context.registerBatch(SQLTypeInfo(kSTRUCT, false, [&output_exprs]() {
+    std::vector<SQLTypeInfo> output_types;
+    output_types.reserve(output_exprs.size());
+    for (auto& expr : output_exprs) {
+      output_types.emplace_back(expr->get_type_info());
+    }
+    return output_types;
+  }()));
+
   // non-groupby Agg
-  auto buffer =
-      context.registerBuffer(origin_value.size(),
-                             exprs_info,
-                             "output_buffer",
-                             [origin_value](context::Buffer* buf) {
-                               auto raw_buf = buf->getBuffer();
-                               memcpy(raw_buf, origin_value.data(), buf->getCapacity());
-                             });
+  if (groupby_exprs.size() == 0) {
+    value_buffer.replace(
+        context.registerBuffer(origin_value.size(),
+                               exprs_info,
+                               "output_buffer",
+                               [origin_value](context::Buffer* buf) {
+                                 auto raw_buf = buf->getBuffer();
+                                 memcpy(raw_buf, origin_value.data(), buf->getCapacity());
+                               }));
+  }
 
   int32_t current_expr_idx = 0;
   for (auto& expr : exprs) {
     auto agg_expr = dynamic_cast<Analyzer::AggExpr*>(expr.get());
 
-    auto cast_buffer = buffer->castPointerSubType(jitlib::JITTypeTag::INT8);
+    auto cast_buffer = value_buffer->castPointerSubType(jitlib::JITTypeTag::INT8);
     auto val_addr_initial = cast_buffer + exprs_info[current_expr_idx].start_offset_;
     auto val_addr = val_addr_initial->castPointerSubType(
         exprs_info[current_expr_idx].jit_value_type_);

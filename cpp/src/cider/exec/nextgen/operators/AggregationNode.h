@@ -27,6 +27,7 @@
 
 namespace cider::exec::nextgen::operators {
 using AggExprsInfoVector = std::vector<context::AggExprsInfo>;
+using JITValuePointerVector = std::vector<jitlib::JITValuePointer>;
 
 class AggNode : public OpNode {
  public:

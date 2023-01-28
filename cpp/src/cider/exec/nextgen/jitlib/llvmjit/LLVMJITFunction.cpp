@@ -291,9 +291,9 @@ JITValuePointer LLVMJITFunction::getArgument(size_t index) {
   }
 }
 
-JITValuePointer LLVMJITFunction::packJITValuesImpl(
-    const std::vector<JITValuePointer>& vals,
-    const uint64_t alignment) {
+JITValuePointer LLVMJITFunction::packJITValuesImpl(const std::vector<JITValuePointer>& vals,
+// JITValuePointer LLVMJITFunction::packJITValues(const std::vector<JITValuePointer>& vals,
+                                               const uint64_t alignment) {
   int64_t memory_count = 0;
   // record memory index address
   std::vector<int64_t> memory_index;

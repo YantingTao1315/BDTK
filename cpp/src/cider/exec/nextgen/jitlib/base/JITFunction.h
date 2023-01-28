@@ -23,6 +23,7 @@
 
 #include <any>
 #include <boost/container/small_vector.hpp>
+#include <vector>
 
 #include "exec/nextgen/jitlib/base/JITControlFlow.h"
 #include "exec/nextgen/jitlib/base/JITValue.h"
@@ -88,6 +89,22 @@ class JITFunction {
   JITValuePointer packJITValues(T&&... params) {
     return packJITValuesImpl({std::forward<T>(params)...}, alignment);
   }
+
+  template <uint64_t alignment = 8, typename T>
+  JITValuePointer packJITValuesVector(std::vector<T> data) {
+    return packJITValuesImpl(data, alignment);
+  }
+
+  // template <uint64_t alignment = 8,
+  //           typename... T,
+  //           std::enable_if_t<std::conjunction_v<
+  //               std::is_same<std::decay_t<T>, jitlib::JITValuePointer>...>>>
+  // JITValuePointer packJITValues(T&&... params) {
+  //   return packJITValues({std::forward<T>(params)...}, alignment);
+  // }
+
+  // virtual JITValuePointer packJITValues(const std::vector<JITValuePointer>& vals,
+  //                                       const uint64_t alignment) = 0;
 
   template <typename T = int32_t>
   JITValuePointer createVariable(JITTypeTag type_tag,

@@ -22,6 +22,8 @@
 #ifndef NEXTEGN_CIDER_FUNCTION_RUNTIME_FUNCTIONS_H
 #define NEXTEGN_CIDER_FUNCTION_RUNTIME_FUNCTIONS_H
 
+#include <cstdint>
+#include <iostream>
 #include "exec/nextgen/context/RuntimeContext.h"
 #include "type/data/funcannotations.h"
 
@@ -95,6 +97,13 @@ extern "C" ALWAYS_INLINE void nextgen_cider_agg_count_nullable(int64_t* agg_val_
     *agg_null_addr = 0;
   }
 }
+
+/******************* GroupBy used hashtable ************************/
+extern "C" ALWAYS_INLINE int8_t* nextgen_cider_get_value_by_key(int8_t* hash_table,int8_t* key_addr) {
+  auto agg_hash_table= reinterpret_cast<cider::hashtable::AggregationHashTable*>(hash_table);
+  return agg_hash_table->get(key_addr);
+}
+
 
 // HashJoin functions For Nextgen
 extern "C" ALWAYS_INLINE int64_t look_up_value_by_key(int8_t* hashtable,

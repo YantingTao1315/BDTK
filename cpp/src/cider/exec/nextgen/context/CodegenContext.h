@@ -38,6 +38,7 @@ class RuntimeContext;
 class Batch;
 using RuntimeCtxPtr = std::unique_ptr<RuntimeContext>;
 using namespace cider_hashtable;
+using SQLTypeVector = std::vector<SQLTypes>;
 
 struct AggExprsInfo {
  public:
@@ -125,6 +126,11 @@ class CodegenContext {
                                            const SQLTypeInfo& type,
                                            CiderSetPtr c_set);
 
+  jitlib::JITValuePointer registerAggHashTable(SQLTypeVector& key_types,
+                                               int8_t* value_addr,
+                                               int32_t len,
+                                               const std::string& name);
+
   RuntimeCtxPtr generateRuntimeCTX(const CiderAllocatorPtr& allocator) const;
 
   struct BatchDescriptor {
@@ -178,6 +184,22 @@ class CodegenContext {
         : ctx_id(id), name(n), hash_table(table) {}
   };
 
+  struct AggHashTableDescriptor {
+    int64_t ctx_id;
+    std::string name;
+    // void* agg_hash_table;
+    hashtable::AggregationHashTable* agg_hash_table;
+
+    AggHashTableDescriptor(int64_t id,
+                           const std::string& n,
+                           SQLTypeVector key_types,
+                           int8_t* value_addr,
+                           int32_t len)
+        : ctx_id(id), name(n) {
+      agg_hash_table = new hashtable::AggregationHashTable(key_types, value_addr, len);
+    }
+  };
+
   void setHashTable(cider::exec::processor::JoinHashTable* join_hash_table) {
     hashtable_descriptor_.first->hash_table = join_hash_table;
   }
@@ -205,6 +227,7 @@ class CodegenContext {
   using HashTableDescriptorPtr = std::shared_ptr<HashTableDescriptor>;
   using CiderSetDescriptorPtr = std::shared_ptr<CiderSetDescriptor>;
   using TrimCharMapsPtr = std::shared_ptr<std::vector<std::vector<int8_t>>>;
+  using AggHashTableDescriptorPtr = std::shared_ptr<AggHashTableDescriptor>;
 
   // registers a set of trim characters for TrimStringOper, to be used at runtime
   // returns an index used for retrieving the charset at runtime
@@ -224,6 +247,7 @@ class CodegenContext {
   std::vector<std::pair<BufferDescriptorPtr, jitlib::JITValuePointer>>
       buffer_descriptors_{};
   std::pair<HashTableDescriptorPtr, jitlib::JITValuePointer> hashtable_descriptor_;
+  std::pair<AggHashTableDescriptorPtr, jitlib::JITValuePointer> agg_hashtable_descriptor_;
   std::vector<std::pair<CiderSetDescriptorPtr, jitlib::JITValuePointer>>
       cider_set_descriptors_{};
   std::vector<std::pair<jitlib::JITValuePointer, utils::JITExprValue>>
